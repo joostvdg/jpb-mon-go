@@ -1,0 +1,70 @@
+pipeline {
+    agent {
+        kubernetes {
+        label 'jpb-mon'
+        yaml """
+kind: Pod
+metadata:
+  labels:
+    build: prom-test-4
+spec:
+  containers:
+  - name: jpb
+    image: caladreas/jpb-mon:0.17.0
+    command: ['/bin/jpb-mon', 'sleep', '--sleep', '3m']
+    tty: true
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "100m"
+      limits:
+        memory: "50Mi"
+        cpu: "100m"
+"""
+        }
+    }
+    environment {
+        CREDS = credentials('api')
+    }
+    stages {
+        stage('Test1') {
+            steps {
+                sh 'env'
+            }
+            post {
+                always {
+                    sh 'env'
+                }
+                success {
+                    sh 'env'
+                }
+            }
+        }
+        stage('Test2') {
+            environment {
+                MASTER = 'jenkins1'
+            }
+            steps {
+                sh 'echo "Hello World!"'
+            }
+            post {
+                always {
+                    sh 'env'
+                }
+                success {
+                    sh 'env'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            container('jpb') {
+                sh "/bin/jpb-mon get-run --host ${JENKINS_URL} --job ${JOB_BASE_NAME} --run ${BUILD_ID} --username ${CREDS_USR} --password ${CREDS_PSW} --push"
+            }
+        }
+        success {
+            sh 'env'
+        }
+    }
+}
